@@ -81,3 +81,16 @@ describe("helpers", () => {
     expect(a.every((x) => x.timestamp <= NOW && x.timestamp > NOW - 30 * DAY)).toBe(true);
   });
 });
+
+describe("cluster details", () => {
+  it("lists every city in a cell, busiest first, with a stable id", () => {
+    const v = (city: string, lat: number, lon: number) => ({ country: "TH", city, lat, lon, timestamp: 0 });
+    const [c] = cluster([v("Bangkok", 13.7, 100.5), v("Nonthaburi", 13.8, 100.4), v("Bangkok", 13.75, 100.52)]);
+    expect(c.cities).toEqual([
+      { city: "Bangkok", count: 2 },
+      { city: "Nonthaburi", count: 1 },
+    ]);
+    expect(c.label).toBe("Bangkok");
+    expect(cluster([v("Bangkok", 13.7, 100.5)])[0].id).toBe(c.id);
+  });
+});

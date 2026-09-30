@@ -78,18 +78,22 @@ export function project(lat: number, lon: number, width: number, height: number)
 }
 
 export interface Cluster {
+  /** Stable grid-cell key, usable as a React key and for selection. */
+  id: string;
   lat: number;
   lon: number;
   count: number;
   label: string;
+  /** Cities in the cell, most visits first (ties alphabetical). */
+  cities: { city: string; count: number }[];
 }
 
 /** Groups visits into lat/lon grid cells of `cellDegrees` to avoid overlapping dots. */
 export function cluster(visits: Visit[], cellDegrees = 5): Cluster[] {
-  const cells = new Map<string, { lat: number; lon: number; count: number; cities: Map<string, number> }>();
+  const cells = new Map<string, { id: string; lat: number; lon: number; count: number; cities: Map<string, number> }>();
   for (const v of visits) {
     const key = `${Math.floor(v.lat / cellDegrees)}:${Math.floor(v.lon / cellDegrees)}`;
-    const cell = cells.get(key) ?? { lat: 0, lon: 0, count: 0, cities: new Map() };
+    const cell = cells.get(key) ?? { id: key, lat: 0, lon: 0, count: 0, cities: new Map() };
     cell.lat += v.lat;
     cell.lon += v.lon;
     cell.count += 1;
@@ -97,12 +101,13 @@ export function cluster(visits: Visit[], cellDegrees = 5): Cluster[] {
     cells.set(key, cell);
   }
   return [...cells.values()]
-    .map((c) => ({
-      lat: c.lat / c.count,
-      lon: c.lon / c.count,
-      count: c.count,
-      label: [...c.cities.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0],
-    }))
+    .map((c) => {
+      const cities = [...c.cities.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([city, count]) => ({ city, count }));
+      return { id: c.id, lat: c.lat / c.count, lon: c.lon / c.count, count: c.count, label: cities[0].city, cities };
+    })
+
     .sort((a, b) => b.count - a.count);
 }
 

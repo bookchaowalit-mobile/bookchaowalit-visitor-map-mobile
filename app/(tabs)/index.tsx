@@ -14,16 +14,19 @@ import {
 const NOW = Date.now();
 const VISITS = sampleVisits(NOW);
 const RANGES: Range[] = ["24h", "7d", "30d", "all"];
+const RANGE_LABEL: Record<Range, string> = { "24h": "Last 24 hours", "7d": "Last 7 days", "30d": "Last 30 days", all: "All time" };
 
 export default function MapScreen() {
   const [range, setRange] = useState<Range>("7d");
   const [width, setWidth] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const height = width / 2;
 
   const visits = useMemo(() => filterByRange(VISITS, range, NOW), [range]);
   const stats = useMemo(() => aggregateByCountry(visits), [visits]);
   const clusters = useMemo(() => cluster(visits), [visits]);
   const max = clusters[0]?.count ?? 1;
+  const selected = clusters.find((c) => c.id === selectedId) ?? null;
 
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
@@ -33,6 +36,7 @@ export default function MapScreen() {
         {RANGES.map((r) => (
           <Pressable
             accessibilityRole="tab"
+            accessibilityLabel={RANGE_LABEL[r]}
             accessibilityState={{ selected: r === range }}
             key={r}
             onPress={() => setRange(r)}
@@ -47,8 +51,8 @@ export default function MapScreen() {
         {visits.length} visits from {stats.length} countries (sample data)
       </Text>
 
+      <Text style={styles.hint}>World map · {clusters.length} clusters · tap a dot for its cities</Text>
       <View
-        accessibilityLabel={`World map with ${clusters.length} visitor clusters`}
         onLayout={onLayout}
         style={[styles.map, { height: height || 160 }]}
       >
@@ -63,14 +67,37 @@ export default function MapScreen() {
             const { x, y } = project(c.lat, c.lon, width, height);
             const size = 8 + 16 * Math.sqrt(c.count / max);
             return (
-              <View
-                accessibilityLabel={`${c.label}: ${c.count} visits`}
-                key={`${c.lat}:${c.lon}`}
-                style={[styles.dot, { width: size, height: size, borderRadius: size / 2, left: x - size / 2, top: y - size / 2 }]}
+              <Pressable
+                accessibilityHint="Shows the cities in this cluster"
+                accessibilityLabel={`${c.label}${c.cities.length > 1 ? ` and ${c.cities.length - 1} more` : ""}: ${c.count} visits`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: c.id === selectedId }}
+                hitSlop={6}
+                key={c.id}
+                onPress={() => setSelectedId(c.id === selectedId ? null : c.id)}
+                style={[
+                  styles.dot,
+                  c.id === selectedId && styles.dotSelected,
+                  { width: size, height: size, borderRadius: size / 2, left: x - size / 2, top: y - size / 2 },
+                ]}
               />
             );
           })}
       </View>
+
+      {selected && (
+        <View style={styles.card} accessibilityLiveRegion="polite">
+          <Text style={styles.cardTitle}>
+            Cluster near {selected.label} · {selected.count} visits
+          </Text>
+          {selected.cities.map((c) => (
+            <View key={c.city} style={styles.statRow}>
+              <Text style={styles.country}>{c.city}</Text>
+              <Text style={styles.count}>{c.count}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Top countries</Text>
@@ -102,6 +129,9 @@ const styles = StyleSheet.create({
   chipText: { color: "#2F6DB5" },
   chipTextActive: { color: "#fff" },
   summary: { color: "#333", fontWeight: "600" },
+  hint: { color: "#555", fontSize: 12 },
+  dotSelected: { backgroundColor: "rgba(47, 109, 181, 0.9)", borderWidth: 2 },
+
   map: { backgroundColor: "#DCE8F5", borderRadius: 12, overflow: "hidden" },
   gridH: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: "#9DB6D3" },
   gridV: { position: "absolute", top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: "#9DB6D3" },
