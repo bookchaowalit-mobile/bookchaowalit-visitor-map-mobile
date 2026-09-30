@@ -33,3 +33,17 @@ Score: 6/10 (was 5/10) — clusters are now interactive and screen-reader reacha
 - No local persistence added: the app holds no user-created data (sample analytics only).
 - Advisories: `overrides.postcss ^8.5.28` clears the high-severity PostCSS advisory in Expo metro-config (minor bump). Remaining `image-size` (metro, bundler-only), `uuid` (via `xcode`) and `decode-uri-component` (via `query-string@7`) need an Expo SDK major upgrade; deliberately not auto-fixed.
 - Verified: typecheck, lint, 9 vitest tests, Android `expo export` bundle.
+
+## Done in this pass (pass 3)
+
+Score: 6.5/10 (was 6/10) — edge-case hunt in `lib/visitors.ts`.
+
+- Bug: country shares used plain rounding, so 199/200 showed "100%" beside another country, and a
+  real 1-in-300 share showed "0%". New `formatShare` shows "99%" / "<1%" at the edges.
+- Bug: "1 visits", "1 countries", "1 clusters" in the summary, card and dot labels; new `plural()`.
+- Bug: a visit with a NaN/Infinity coordinate produced a NaN cluster (invisible dot, NaN position);
+  such visits are skipped. Longitudes outside ±180 (190° vs -170°) now land in the same cluster.
+- Bug: " th" vs "TH" and "Bangkok " vs "Bangkok" were counted separately; codes/cities are trimmed.
+- A11y: each Top-countries row is one accessible element ("Thailand: 12 visits, 40%") instead of
+  three fragments (flag emoji, name, count).
+- Verified: typecheck, `expo lint`, vitest (14), Android `expo export`; new tests fail on the old code.

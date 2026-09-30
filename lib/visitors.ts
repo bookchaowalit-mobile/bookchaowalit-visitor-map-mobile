@@ -51,11 +51,28 @@ export function filterByRange(visits: Visit[], range: Range, now: number): Visit
   return visits.filter((v) => v.timestamp > since && v.timestamp <= now);
 }
 
+/** "1 visit", "3 visits", "1 country", "2 countries". */
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+/**
+ * Share (0..1) as a whole percentage that never lies at the edges: a real but
+ * tiny share shows "<1%" (not "0%") and anything short of all shows at most "99%".
+ */
+export function formatShare(share: number): string {
+  if (!Number.isFinite(share) || share <= 0) return "0%";
+  if (share >= 1) return "100%";
+  const pct = Math.round(share * 100);
+  if (pct < 1) return "<1%";
+  return `${Math.min(99, pct)}%`;
+}
+
 /** Visits per country, most first (ties alphabetical), with share of total (0..1). */
 export function aggregateByCountry(visits: Visit[]): CountryStat[] {
   const counts = new Map<string, number>();
   for (const v of visits) {
-    const code = v.country.toUpperCase();
+    const code = v.country.trim().toUpperCase();
     counts.set(code, (counts.get(code) ?? 0) + 1);
   }
   const total = visits.length;
@@ -92,12 +109,17 @@ export interface Cluster {
 export function cluster(visits: Visit[], cellDegrees = 5): Cluster[] {
   const cells = new Map<string, { id: string; lat: number; lon: number; count: number; cities: Map<string, number> }>();
   for (const v of visits) {
-    const key = `${Math.floor(v.lat / cellDegrees)}:${Math.floor(v.lon / cellDegrees)}`;
+    // A NaN coordinate would poison the cell average and render an invisible dot.
+    if (!Number.isFinite(v.lat) || !Number.isFinite(v.lon)) continue;
+    const lat = Math.max(-90, Math.min(90, v.lat));
+    const lon = ((((v.lon + 180) % 360) + 360) % 360) - 180; // 190° and -170° are the same place
+    const key = `${Math.floor(lat / cellDegrees)}:${Math.floor(lon / cellDegrees)}`;
     const cell = cells.get(key) ?? { id: key, lat: 0, lon: 0, count: 0, cities: new Map() };
-    cell.lat += v.lat;
-    cell.lon += v.lon;
+    cell.lat += lat;
+    cell.lon += lon;
     cell.count += 1;
-    cell.cities.set(v.city, (cell.cities.get(v.city) ?? 0) + 1);
+    const city = v.city.trim() || "Unknown";
+    cell.cities.set(city, (cell.cities.get(city) ?? 0) + 1);
     cells.set(key, cell);
   }
   return [...cells.values()]
@@ -107,7 +129,6 @@ export function cluster(visits: Visit[], cellDegrees = 5): Cluster[] {
         .map(([city, count]) => ({ city, count }));
       return { id: c.id, lat: c.lat / c.count, lon: c.lon / c.count, count: c.count, label: cities[0].city, cities };
     })
-
     .sort((a, b) => b.count - a.count);
 }
 

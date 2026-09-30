@@ -7,6 +7,8 @@ import {
   countryName,
   filterByRange,
   flagEmoji,
+  formatShare,
+  plural,
   project,
   sampleVisits,
 } from "../../lib/visitors";
@@ -48,10 +50,10 @@ export default function MapScreen() {
       </View>
 
       <Text style={styles.summary}>
-        {visits.length} visits from {stats.length} countries (sample data)
+        {plural(visits.length, "visit")} from {plural(stats.length, "country", "countries")} (sample data)
       </Text>
 
-      <Text style={styles.hint}>World map · {clusters.length} clusters · tap a dot for its cities</Text>
+      <Text style={styles.hint}>World map · {plural(clusters.length, "cluster")} · tap a dot for its cities</Text>
       <View
         onLayout={onLayout}
         style={[styles.map, { height: height || 160 }]}
@@ -69,7 +71,7 @@ export default function MapScreen() {
             return (
               <Pressable
                 accessibilityHint="Shows the cities in this cluster"
-                accessibilityLabel={`${c.label}${c.cities.length > 1 ? ` and ${c.cities.length - 1} more` : ""}: ${c.count} visits`}
+                accessibilityLabel={`${c.label}${c.cities.length > 1 ? ` and ${c.cities.length - 1} more` : ""}: ${plural(c.count, "visit")}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: c.id === selectedId }}
                 hitSlop={6}
@@ -88,7 +90,7 @@ export default function MapScreen() {
       {selected && (
         <View style={styles.card} accessibilityLiveRegion="polite">
           <Text style={styles.cardTitle}>
-            Cluster near {selected.label} · {selected.count} visits
+            Cluster near {selected.label} · {plural(selected.count, "visit")}
           </Text>
           {selected.cities.map((c) => (
             <View key={c.city} style={styles.statRow}>
@@ -103,7 +105,12 @@ export default function MapScreen() {
         <Text style={styles.cardTitle}>Top countries</Text>
         {stats.length === 0 && <Text style={styles.empty}>No visits in this range.</Text>}
         {stats.map((s) => (
-          <View key={s.country} style={styles.statRow}>
+          <View
+            accessibilityLabel={`${countryName(s.country)}: ${plural(s.count, "visit")}, ${formatShare(s.share)}`}
+            accessible
+            key={s.country}
+            style={styles.statRow}
+          >
             <Text style={styles.country}>
               {flagEmoji(s.country)} {countryName(s.country)}
             </Text>
@@ -111,7 +118,7 @@ export default function MapScreen() {
               <View style={[styles.bar, { width: `${Math.round(s.share * 100)}%` }]} />
             </View>
             <Text style={styles.count}>
-              {s.count} · {Math.round(s.share * 100)}%
+              {s.count} · {formatShare(s.share)}
             </Text>
           </View>
         ))}

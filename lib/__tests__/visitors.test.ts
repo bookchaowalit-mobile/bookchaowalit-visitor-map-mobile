@@ -6,6 +6,8 @@ import {
   countryName,
   filterByRange,
   flagEmoji,
+  formatShare,
+  plural,
   project,
   sampleVisits,
 } from "../visitors";
@@ -92,5 +94,33 @@ describe("cluster details", () => {
     ]);
     expect(c.label).toBe("Bangkok");
     expect(cluster([v("Bangkok", 13.7, 100.5)])[0].id).toBe(c.id);
+  });
+});
+
+describe("pass 3 edge cases", () => {
+  const mk = (over: Partial<Visit>): Visit => ({ country: "TH", city: "Bangkok", lat: 13.75, lon: 100.5, timestamp: 0, ...over });
+  it("formats shares without rounding to 100% or down to 0%", () => {
+    expect(formatShare(199 / 200)).toBe("99%");
+    expect(formatShare(1 / 300)).toBe("<1%");
+    expect(formatShare(1)).toBe("100%");
+    expect(formatShare(0)).toBe("0%");
+    expect(formatShare(0.456)).toBe("46%");
+  });
+  it("pluralises counts", () => {
+    expect(plural(1, "visit")).toBe("1 visit");
+    expect(plural(0, "visit")).toBe("0 visits");
+    expect(plural(2, "country", "countries")).toBe("2 countries");
+  });
+  it("skips visits with NaN coordinates instead of producing NaN clusters", () => {
+    const out = cluster([mk({}), mk({ lat: Number.NaN }), mk({ lon: Number.POSITIVE_INFINITY })]);
+    expect(out).toHaveLength(1);
+    expect(Number.isFinite(out[0].lat) && Number.isFinite(out[0].lon)).toBe(true);
+  });
+  it("puts 190° and -170° longitude in the same cluster", () => {
+    expect(cluster([mk({ lon: 190 }), mk({ lon: -170 })])).toHaveLength(1);
+  });
+  it("trims country codes and city names before grouping", () => {
+    expect(aggregateByCountry([mk({ country: " th" }), mk({ country: "TH" })])).toEqual([{ country: "TH", count: 2, share: 1 }]);
+    expect(cluster([mk({ city: "Bangkok " }), mk({})])[0].cities).toEqual([{ city: "Bangkok", count: 2 }]);
   });
 });
